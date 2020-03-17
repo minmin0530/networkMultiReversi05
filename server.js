@@ -56,8 +56,6 @@ io.sockets.on("connection", function (socket) {
         let x = data.value.x;
         let y = data.value.y;
 
-
-
         for (let i = 0; i < 8; ++i) {
           for (let xx = x, yy = y; xx != CONST_X[i] && yy != CONST_Y[i]; xx += ADD_X[i], yy += ADD_Y[i]) {
               if (field[data.value.fieldNumber][yy][xx] == data.value.turn) {
@@ -80,18 +78,10 @@ io.sockets.on("connection", function (socket) {
                   }
               }
           }
-      }
-
-
-
-
-
-
-
-
-
-
+        }
+        
         data.value.turn += 1;
+        data.value.turn = data.value.turn % players.length;
         var d = {
           'x':data.value.x,
           'y':data.value.y,
@@ -156,7 +146,7 @@ io.sockets.on("connection", function (socket) {
         fieldNumberArray[data] = 2;
       }
 
-      io.sockets.emit("startGame", data);
+      io.sockets.emit("startGame", {data:data, players: players});
     });
 
     // 離脱

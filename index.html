@@ -36,9 +36,11 @@
     var ctx = [];
     var PLAYER_TURN = 0;
     var turn = PLAYER_TURN;
+    var turn_server = PLAYER_TURN;
     var count = 0;
     var startGameFlag = false;
     var tableArray = [];
+    var players = [];
 
     /////////////////////////////////
     // 最初に自分の名前(番号)を受け取る //
@@ -109,7 +111,8 @@
     socketio.on("startGame", function(data){
       console.log("startGame:data"+ data);
       console.log("startGame:fieldNumber"+ fieldNumber);
-      if (data == fieldNumber) {
+      if (data.data == fieldNumber) {
+        players = data.players;
         startGameFlag = true;
         panel.innerHTML = "";
         const span = document.createElement("span");
@@ -122,6 +125,7 @@
     // 誰かがコマを置いた処理の受け取り //
     /////////////////////////////////
     socketio.on("put", function (data) {
+      turn_server = data.value.turn;
         for (var y = 0; y < 8; ++y) {
         for (var x = 0; x < 8; ++x) {
           if (data.value.field[y][x] != -1) {
@@ -162,8 +166,14 @@
       if(!e) e = window.event;
       
       turn = myName % 12;
-      console.log(turn);
-	    console.log(myName);
+
+      // console.log(joinNumber);
+      console.log(turn_server + "::" + turn + "::" + players[turn_server % players.length]);
+      // 順番管理機能を作らないといけない。このif文は消す事になる。
+      if (count > 0 && players[turn_server % players.length] != turn) {
+        return;
+      }
+      turn = turn_server;
 
       if (!startGameFlag) {
         return;
@@ -172,11 +182,6 @@
         return;
       }
 
-      // mouseX = e.clientX-14;
-      // mouseY = e.clientY-14;
-
-      // var x = 44+mouseX - mouseX % CELL_SIZE;
-      // var y = 44+mouseY - mouseY % CELL_SIZE;
       const x0 = e.clientX - e.clientX % CELL_SIZE + 40;
       const y0 = e.clientY - e.clientY % CELL_SIZE + 40;
       const x = (x0-40)/CELL_SIZE;
@@ -195,52 +200,48 @@
       }
       field[y][x] = turn;
 
-ctx.fillStyle = colorArray[turn];//コマの色
+      ctx.fillStyle = colorArray[turn];//コマの色
 
-for (let i = 0; i < 8; ++i) {
-    for (let xx = x, yy = y; xx != CONST_X[i] && yy != CONST_Y[i]; xx += ADD_X[i], yy += ADD_Y[i]) {
-        if (field[yy][xx] == turn) {
-            let breakFlag = false;
-            for (var xxx = x, yyy = y; (xxx != xx || ADD_X[i] == 0) && (yyy != yy || ADD_Y[i] == 0); xxx += ADD_X[i], yyy += ADD_Y[i]) {
-                if (field[yyy][xxx] == -1) {//コマを置いてないマスがある場合、ループを抜ける
-                    breakFlag = true;
-                    break;
-                }
-            }
-            if (breakFlag) {
-                break;
-            }
+      for (let i = 0; i < 8; ++i) {
+          for (let xx = x, yy = y; xx != CONST_X[i] && yy != CONST_Y[i]; xx += ADD_X[i], yy += ADD_Y[i]) {
+              if (field[yy][xx] == turn) {
+                  let breakFlag = false;
+                  for (var xxx = x, yyy = y; (xxx != xx || ADD_X[i] == 0) && (yyy != yy || ADD_Y[i] == 0); xxx += ADD_X[i], yyy += ADD_Y[i]) {
+                      if (field[yyy][xxx] == -1) {//コマを置いてないマスがある場合、ループを抜ける
+                          breakFlag = true;
+                          break;
+                      }
+                  }
+                  if (breakFlag) {
+                      break;
+                  }
 
-            for (var xxx = x, yyy = y; (xxx != xx || ADD_X[i] == 0) && (yyy != yy || ADD_Y[i] == 0); xxx += ADD_X[i], yyy += ADD_Y[i]) {
-                field[yyy][xxx] = turn;
-                if (field[yyy + ADD_Y[i]][xxx + ADD_X[i]] == turn) {//同じ色のコマが途中にあった場合、ループを抜ける
-                    break;
-                }
-            }
-        }
-    }
-}
+                  for (var xxx = x, yyy = y; (xxx != xx || ADD_X[i] == 0) && (yyy != yy || ADD_Y[i] == 0); xxx += ADD_X[i], yyy += ADD_Y[i]) {
+                      field[yyy][xxx] = turn;
+                      if (field[yyy + ADD_Y[i]][xxx + ADD_X[i]] == turn) {//同じ色のコマが途中にあった場合、ループを抜ける
+                          break;
+                      }
+                  }
+              }
+          }
+      }
 
-let afterPoint = 0;//コマを置いた後の
-for (let x = 0; x < 8; ++x) {
-    for (let y = 0; y < 8; ++y) {
-        if (field[y][x] == turn) {
-            afterPoint += 1;
-        }
-    }
-}
-console.log(beforePoint + "@@" + afterPoint);
-if (beforePoint + 1 == afterPoint && count >= joinNumber * 2) {
-    field[y][x] = -1;
-    return;
-}
+      let afterPoint = 0;//コマを置いた後の
+      for (let x = 0; x < 8; ++x) {
+          for (let y = 0; y < 8; ++y) {
+              if (field[y][x] == turn) {
+                  afterPoint += 1;
+              }
+          }
+      }
+      console.log(beforePoint + "@@" + afterPoint);
+      if (beforePoint + 1 == afterPoint && count >= joinNumber * 2) {
+          field[y][x] = -1;
+          return;
+      }
 
-
-
-
-++count;
+      ++count;
     
-//      ++turn;
       for (var v = 0; v < nameArray.length + 3; ++v) {
         if (v == turn) {
           ctx[0].fillStyle = colorArray[myName % 12];
@@ -250,12 +251,10 @@ if (beforePoint + 1 == afterPoint && count >= joinNumber * 2) {
       ctx[0].arc((x+1) * 79 - 36, (y+1) * 79 - 36,CELL_HALF_SIZE,0,Math.PI*2,true);
       ctx[0].fill();
     
-      var xx = x;//Math.floor(x/CELL_SIZE);    
-      var yy = y;//Math.floor(y/CELL_SIZE);    
       var array = {
-          'x': xx,
-          'y': yy,
-          'turn': myName,//turn,
+          'x': x,
+          'y': y,
+          'turn': turn_server,//turn,
           'myName': myName,
           'fieldNumber': fieldNumber
         };
